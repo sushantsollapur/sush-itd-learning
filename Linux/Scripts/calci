@@ -1,0 +1,32 @@
+#!/bin/bash
+
+function usage() {
+  echo "USAGE $0 [option] [number1] [number2]
+             [OPTION]
+               -a, Addition of [number1] [number2]
+               -s, Subraction of [number1] [number2]
+               -m, Multiplication of [number1] [number2]
+               -d, Division of [number1] [number2]
+"
+}	
+
+if [[ $# -lt 3 ]]; then 
+    usage
+fi	
+
+case $1 in
+   -a) output=$(( $2 + $3 )); echo "The result: $output"
+   ;;
+   -s) output=$(( $2 - $3 )); echo "The result: $output"
+   ;;
+   -m) output=$(( $2 * $3 )); echo "The result: $output"
+   ;;
+   -d) output=$(( $2 / $3 )); echo "The result: $output"
+   ;;
+   -h) usage
+   ;;
+   --help) usage
+   ;;
+   *) echo "Unknow option: "; usage
+   ;;	   
+esac

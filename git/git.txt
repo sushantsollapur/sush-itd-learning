@@ -1,0 +1,113 @@
+
+Remote Repository:
+  - A remote repository is a Git repository hosted on a remote server or a code hosting platform like GitHub, GitLab, or Bitbucket.
+  - It acts as a centralized location for collaborating changes from multiple developers, where multiple developers can push and pull     changes to keep the repository in sync.
+  - We can not do any changes directly to remote repository and a valid user with proper access can push changes to remote repo from only local repo.
+
+Local Repository:
+  - A local repository is a copy of a Git repository that resides on your local machine.
+  - It contains the complete copy of the repo repository, including all branches, commits, and files etc.
+  - The local repository allows you to make changes, commit them, switch between branches, and perform Git operations without needing a live network connection to remote repo.
+  - You can create a local repository by initializing a new repository with git init or cloning an existing repository using git clone.
+  
+  #To get a local repo / to download / clone a remote repo 
+      git clone <url_of_the_remote_repository>
+
+git status 
+  - The git status is used to display the current status of your Git repository.
+  - shows information about which files have been modified, which files are staged for the next commit, and which files are untracked.
+
+git log 
+  - git log is used to view all commits history of a Git repository.
+  - It displays list of commits starting from the most recent commit on top.
+  - The commit history provides essential information about the changes made to the repository such as, 
+      commit messages, authors, dates, and unique identifiers (commit hash/id).
+
+git add 
+  - Adds changes to the staging area. 
+  - This is where you can review your changes before committing them to your local repository.
+  # Add all changes to the staging area
+    git add .   (OR)   git add --all
+    
+    git add -A is equivalent to git add --all
+    git add -u is equivalent to git add --update
+    
+    NOTE: Extra information just in case if you want to try but not required
+    Command	        New-Files	    Modified-Files	Deleted-Files	        Description
+      git add -A	     YES	            YES	          YES	                Stage all (new, modified, deleted) files
+      git add .	     YES	            YES	          YES	                Stage all (new, modified, deleted) files in current folder
+      git add -u	      NO	            YES	          YES	                Stage modified and deleted files only
+        
+git commit 
+  - Create a new commit containing the current changes of the stagging area (added files and directories)
+  - We need to give a commit message which we can see in the git log message describing the changes.
+  
+  # Commit the changes with a message
+      git commit -m "Added new feature"
+      
+git push 
+  - git push is a command used to push your local commited changes (after git add and git commit) to a remote repository.
+  - When you make changes to your local repository and want to share them with others or synchronize them with a remote repository 
+    (such as on GitHub, GitLab, or Bitbucket), you use git push to send those changes to the remote repository.
+  
+git pull 
+  - git pull is a command used to fetch and merge changes from a remote repository into your local repository.
+  - When others pushed changes to the remote repository, you can use git pull to update your local repository to get new commits from remopte repository.
+
+git merge vs rebase 
+
+Both git merge and rebase are used to combines the changes from one branch into another branch but different approaches to integrating changes from one branch into another in Git
+
+merge 
+   - Merge creates a new commit which shows the changes combined from both branches. 
+   - Merge preserves the history of both branches, so you can see which changes came from which branch.
+   - Merge can sometimes create merge conflicts, we need to discuss with the developers and solve the merge conflicts to complete the merge.
+     (usually merge conflicts occurs if 2 different users try the chagne the same lines in the same file and if we try to merge it)
+   
+rebase 
+   - Rebase do not creates a new commit that combines the changes from both branches. 
+   - Rebase rewrites the history of the first branch, it will bring all the commits from source branch and place it to the tip of 
+     the destination branch. (Commit history usually will become a linear and cleaner tree)
+   - Rebases do not create merge conflicts, but they can make it difficult to track the history of your repository.  
+   
+git fetch vs pull
+
+git fetch and git pull are both used to update local repository changes from remote repository.
+
+git fetch 
+  - Brings the changes from a remote repository into your local repository.
+  - Does not automatically merge the changes into your current branch in local repository.
+  - Instead it keeps changes in a temporary branch called FETCH_HEAD and we can inspect the changes then decide how you want to integrate       them into our local work in local repository.
+
+git pull
+  - git pull, combines the functionality of git fetch and git merge in a single step.
+  - It fetches the latest changes from the remote repository and automatically merges them into the current local branch. 
+  - It updates the remote-tracking branches with local branch and incorporates the changes into your local branch.
+  - It performs an automatic merge, which means if there are conflicts, we will need to resolve them.
+   
+git cherry-pick
+  - git cherry-pick is a Git command used to pick and apply a specific commit from one branch to another. 
+  - It allows us to select individual commits and apply them to a different branch, essentially picking out specific changes/commits.  
+  
+  STEP1: Choose and remember the commit to put it in another branch (source branch)
+          git log
+  STEP2: Switch to the branch where you want to apply the commit (destination branch)
+          git checkout <destination_branch>
+  STEP3: git cherry-pick with the commit which we want to apply (from STEP1)
+          git cherry-pick <source_branch_commit>
+  
+git stash 
+  - The git stash command is used to save the current state of your working directory and index, which is a temporary area where you can        store changes that you're not ready to commit yet. 
+  - This is useful for when you need to switch to a different branch or work on a different task, but you don't want to lose the changes        you've made so far and dont want to commit it yet.
+  
+  # To stash the current un-commited changes 
+        git stash 
+  # To list all the stashes 
+        git stash list 
+  # To bring the stash back 
+        git stash pop 
+            - To apply the recent stash and also remove the most recent stash in a single operation.
+        git stash apply
+            - This subcommand applies the most recent stash back to your working directory, restoring the changes you stashed.           
+  # To remove changes from stash 
+        git stash drop 
