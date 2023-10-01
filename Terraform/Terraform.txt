@@ -1,6 +1,7 @@
 Terraform 
 	- Terraform is an open source tool from HashiCorp company used to 
 	  write Insfrastructure as A Code (IaC) to automate provisioning the public cloud insfrasructure.
+	  added important
   	
 	- Terraform is written in Golang and available on GitHub 
 	
