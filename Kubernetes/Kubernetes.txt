@@ -380,3 +380,572 @@ StatefulSet
 	Like a Deployment, a StatefulSet manages Pods that is based on an identical container spec and can be used to create replicas of pods. Unlike a Deployment, a StatefulSet maintains a sticky identity for each of its Pods replicas.
 
 
+Pod assignment (How to create pods in chosen nodes / particular node)
+
+1. Node Selector
+	- Node selector is a way of creating / binding pod to a worker node based on the node label 
+	- We use node selector to redirect the pod create to a worker node.
+	- We can't use any logical expressions in selection. (only one label can be matched)	
+
+	Create a label on worker node 
+	      kubectl label node <node_name> <key>=<value>
+
+	Using node selector in pod 
+		spec:
+     		  nodeSelector:
+        	     <key>: <value>
+		  containers:
+		     ......
+
+  2. Node affinity and anti-affinity 
+		Node affinity 
+			- nodeSelector with logical expressions is affinity 
+			- using node affinity we can spread the pod schedule on worker nodes based on 
+					- cpacity (memory-intense mode)
+					- Availability zone (HA mode)
+
+			prefferedDuringSchedullingIgnoreDuringExecution - The scheduler tries to find a node matching the rules, if 
+			a matching node is not 	available then scheduler still schedules the pods in normal way.
+
+			requiredDuringSchedullingIgnoreDuringExecution - THe scheduler will not schedule the pod until 
+			the rules are matching.
+
+			IgnoreDuringExecution - If the node labels are changes after the scheduling of pods still the pods continues to run.
+			
+			spec:
+				affinity:
+					nodeAffinity:
+					requiredDuringSchedulingIgnoredDuringExecution:
+						nodeSelectorTerms:
+						- matchExpressions:
+						- key: topology.kubernetes.io/zone
+							operator: In
+							values:
+							- antarctica-east1
+							- antarctica-west1
+		node Anti-affinity (Inter-pod Affinity)
+			- This is used to define whether a given pod should or should not be 
+			  scheduled on a particular node based on conditional labels.	
+			
+			spec: 
+				containers: 
+						........
+						
+				affinity: 
+					nodeAntiAffinity:
+					  requiredDuringSchedulingIgnoredDuringExecution:
+						IfNotPresent:
+						- matchExpressions:
+						  - key: <label_key>
+							operator: In
+							values:
+							- <label_value>
+
+	3. 	Taints and Tolerations	
+			- Taints are used to mark worker nodes so that the marked worker node 
+			  repels all the pods without having Tolerations for that taint.
+
+			taints Effects 
+				1) NoSchedule 
+						- This taint means unless a pod with the Tolerations matching the scheduler 
+						  will never schedule the pod.
+
+				2) NoExecute
+						- This taint means if pod should be running means tolerations should be there.
+						- We can use this to delete some sets pods based on conditions.
+
+			To taint a worker 
+				kubectl taint node <node_name> <taint_key>=<taint_value>:<taint_effect>
+
+			To untaint a worker  (use - at the end of taint command)
+				kubectl taint node <node_name> <taint_key>=<taint_value>:<taint_effect>-
+
+			tolerations in pod 
+				spec: 
+				   tolerations:	
+				    - key: <taint_key>
+					  operator: "Equal"
+					  value: <taint_value>
+					  effect: <taint_effect>
+						
+			Note: if the operator used is "Equal then we need to provide value and if use Exists then no value is required.	
+
+
+		
+RBAC  (Role Based Access Control)
+	- Account 
+	- Roles 
+	- Bind/Attach the role to account 
+
+	Accounts 
+		- USER ACCOUNT: it is used for a human users to control the access to k8s.
+		- SERVICE ACCOUNT: It will be used by an application which need the access to the cluster.
+						   Instead of password we used tokens for SA	
+			STEP 1: To create a service account 
+					1. kubectl create sa <service_account_name>
+					
+					2.  spec file.
+						apiVersion: v1
+						kind: ServiceAccount 
+						metadata: 
+							name: <service_account_name>
+
+			STEP 2: Create a token for above service account 
+					apiVersion: v1
+					kind: Secret 
+					metadata: 
+						name: <secret_name>
+					annotations: 
+						kubernetes.io/service-account.name: <service_account_name>
+					type: 
+						kubernetes.io/service-account-token
+
+	Roles
+	1. Role
+		- Roles are set of rules to control the access to k8s on a account.
+		- Role are always user define and we need to attach it to a account.
+		- Roles are bound to namespace and it work only for a namespace which is defined in it.
+		- rbac.authorization.k8s.io/v1 is the api version.
+		common fields in role 
+			apiGroups: List of apis to control the accept  (any [], [""], ["*"])
+			Resources: k8s objects on which we want to define this roles for a account 
+			resourceNames: control the access on sub resources groups
+			Verbs: The operation / actions that we can perform 
+					ex: ["get","list","create","apply","delete","watch","update","watch","patch","proxy","post"]
+
+	Role Binding 
+		- Role Binding is used to attach a role to a account 
+		- Role Binding is also a namespace level object.
+
+		- We can also use  RoleBinding to attach ClusterRole to Role within a namespace. 
+
+		subjects: Account or Groups 
+		roleRef: the role that we need to attach the account 	
+
+	To check the access of another account 
+		kubectl auth can-i <verb> <object> --as=system:<account_type>:<account_namespace>:<account_name>
+		ex: kubectl auth can-i list pods --as=system:serviceaccount:default:k8s-sa
+
+	2. ClusterRole 
+		 - This is cluster wide role.
+	     - We should not specify any namespace.	
+
+		Cluster Role Binding  
+			- To bind a cluster role to any account.
+
+How to configure kubectl from outside or from any other machine using service account 
+
+1. Install kubectl on Linux
+
+	STEP1: curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl STEP2: chmod +x ./kubectl
+	STEP3: sudo mv ./kubectl /usr/local/bin/kubectl
+
+	To verify installation: kubectl version --client
+
+2. Setting Kubernetes Cluster parameters
+	kubectl config set-cluster <cluster_name> --server=https://<IPorDNS>:<Port> --insecure-skip-tls-verify=true
+	
+	Note: The above command will create the basic config file $HOME/.kube/config
+	      <cluster_name> any name can be given for your reference 
+ 	      <IPorDNS> should be public one
+	      <Port> - 6443 (To get port number - kubectl cluster-info)
+	
+3. Adding the token of the user to the context
+
+	STEP 1: Copy the secret token of service account from the cluster to connect
+		   Kubectl describe secret <secter_name>
+
+	STEP 2: kubectl config set-credentials <user_name> --token=<copied token>
+			Note: <user-name> any name can be given for your reference
+
+4. Creating the Serviceaccount as User
+	kubectl config set-context <context_name> --cluster=<cluster_name> --user=<user_name>
+
+		Note: <context_name> any name can be given for your reference
+		      <cluster_name> same name as from 2.
+		      <user_name>    same name as from 3.
+
+5. Switch the Context to your newly created user-context
+	kubectl config use-context <context-name>
+		Note: <context_name> same name as from 4.
+	
+	We can have multiple contexts with different cluster service accounts. 
+		To list contexts: kubectl config get-contexts
+
+
+----------------------------------------- Just to trial purpose -----------------------------------------
+
+USER ACCOUNT
+1.	Create a useraccount 
+	sudo useradd -s /bin/bash -d /home/<username>/ -m -G sudo <username>
+
+2.	Create a private key for the above user created:
+	sudo openssl genrsa -out <username>.key 2048
+
+3.	Create a certificate signing request (CSR). CN is the username and O the group.
+	sudo openssl req -new -key <username>.key -out <username>.csr -subj "/CN=<username>/O=sudo"
+
+4.	Sign the CSR with the Kubernetes
+	Note: We have to use the CA cert and key which are normally in /etc/kubernetes/pki/
+	
+	sudo openssl x509 -req -in <username>.csr \
+  	-CA /etc/kubernetes/pki/ca.crt \
+  	-CAkey /etc/kubernetes/pki/ca.key \
+  	-CAcreateserial \
+  	-out <username>.crt -days 500
+
+5.	Create a “.certs” directory where we are going to store the user public and private key.
+	sudo mkdir .certs && sudo mv jean.crt jean.key .certs
+
+6.	Now we need to grant all the created files and directories to the user:
+	sudo chown -R <username>: /home/<username>/
+	sudo vi /etc/sudoers and add <username>   ALL=(ALL:ALL)  ALL	
+
+7.	Change user to <username>
+	sudo -u <username> bash
+
+8.	Create kubeconfig for <username>
+	kubectl config set-credentials <username> \
+ 	 --client-certificate=/home/<username>/.certs/<username>.crt \
+ 	 --client-key=/home/<username>/.certs/<username>.key
+
+9.	Create context for <username> and cluster
+	kubectl config set-context <context-name> \
+	--cluster=<cluster-name> \
+	--user=<username>
+
+10.	Switch the above created context 
+	kubectl config use-context <context-name>	
+
+11.	Edit the file $HOME/.kube/config  to Add certificate-authority-data: and server: keys under cluster. 
+	apiVersion: v1
+	clusters:
+	- cluster:
+	   certificate-authority-data: {get from /etc/kubernetes/admin.conf}
+	   server: {get from /etc/kubernetes/admin.conf}
+	  name: kubernetes
+	. . . . 
+	
+12.	Check the setup by running the command 
+ 	Kubectl get nodes/pods
+	Note: If “Error from server (Forbidden):” then create the required 
+ 	roles/clusterRoles for the user <username>	
+
+---------------------------------------------------------------------------------------------------------------------------	
+
+Kubernetes Volumes 
+
+1. HostPath mount:
+
+		- A HostPath volume mounts a directory from the node's file system into the pod.
+		- It's useful when you need access to host-specific files or directories, but it's not recommended for production use due to security concerns.	
+
+		- In addition to the required path property, you can optionally specify a type for a hostPath volume.
+				blank - Empty string (default) is for backward compatibility, which means that no checks will be performed before mounting the hostPath volume.
+				DirectoryOrCreate - If nothing exists at the given path, an empty directory will be created there as needed with permission set to 0755
+				Directory - A directory must exist at the given path 
+				FileOrCreate - If nothing exists at the given path, an empty file will be created there as needed with permission set to 0644
+				File - A file must exist at the given path
+
+			containers:
+		  	- name: ip-app
+    		  image: harshajain/ip-app:1
+		      ports:
+		      - containerPort: 80
+			  volumeMounts:
+		   	  - name: hostpath-volume
+		      	mountPath: "/app/volume"
+
+			volumes:
+			  - name: hostpath-volume
+			    # directory location on host machine
+			    hostPath:
+			       path: /home/ubuntu/pod_data
+			       type: DirectoryOrCreate
+
+	2. PersistentVolumes (PVs) and PersistentVolumeClaims (PVCs):
+		
+		Persistent Volume (pv)
+			- PVs are cluster-level resources that represent physical storage which we reserve as persistent volume.
+			- This storage space can be claimed to any pod in the cluster.
+			- These are cluster level object and not bounded to namespace. 		   
+
+			we can control the access  (accessModes)
+			 - ROX (ReadOnlyMany) 
+				Volume can be claimed from multiple worker nodes in read-only mode 
+			 - RWX (ReadWriteMany)
+				Volume can be claimed from multiple worker nodes in read-write mode 
+			 - RWO (ReadWriteOnce)
+				- Volume can be claimed from only one worker node in read-write mode. 
+				- k8s allow multiple pods to access the volume when the pods are running on the same node.
+		     - RWOP (ReadWriteOncePod)
+		        - The volume can be mounted as read-write by only a single Pod. 
+				- Use ReadWriteOncePod access mode if you want to ensure that only one pod across whole cluster 
+				  can read-write that PVC.
+
+		Persistent Volume Claim (pvc)
+			- PVCs are requests for storage made by pods. PVC requests a specific amount and type of storage (e.g., ReadWriteOnce, ReadOnlyMany, ReadWriteMany).
+			- PVs are bound to PVCs, ensuring that the requested storage is allocated to the pod.
+			- After we create pvc, k8s looks for a Persistent Volume which matches the claim with same configuration.
+			- If Persistent Volume is found with same configuration, it binds the claim to the pod as volume.
+
+	3. Storage Classes (Dynamic PV):
+
+		- Dynamic volume provisioning starts with the definition of Storage Classes in Kubernetes.
+		- A Storage Class is a template for creating storage volumes with specific characteristics, such as access mode (e.g., ReadWriteOnce, ReadOnlyMany, ReadWriteMany), storage capacity, and provisioning parameters.
+		- Each Storage Class is associated with a particular storage backend or provider (AWS - EBS, EFS, Azure etc.).
+
+
+		1. Install Container Storage Interface (CSI) 
+			- Container Storage Interface (CSI) is a standard for connecting and managing storage systems from container orchestrators like Kubernetes. 
+			- CSI allows storage providers to develop their own drivers to integrate with Kubernetes, making it easier to use a wide range of storage solutions with Kubernetes.	
+
+			Refer: https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/install.md
+
+			kubectl create secret generic aws-secret \
+			    --namespace kube-system \
+			    --from-literal "key_id=${AWS_ACCESS_KEY_ID}" \
+			    --from-literal "access_key=${AWS_SECRET_ACCESS_KEY}"	
+
+			kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=release-1.22"  
+	
+	4. ConfigMap and Secret Volumes:
+
+			- ConfigMap and Secret volumes allow you to mount configuration data or secrets as files into a pod.
+			- ConfigMaps are used for storing configuration settings, and Secrets are used for sensitive data like API keys or passwords.
+			- These volumes are typically used when you want to inject configuration or secrets into your containers.
+
+			echo 'password' | tr -d \\n | base64
+
+	5. EmptyDir Volume:
+
+		- An EmptyDir volume is a temporary storage volume that's created when a pod is assigned to a node.
+		- It's useful for sharing files between containers within the same pod or for storing temporary data.
+		- Data stored in an EmptyDir volume is lost when the pod is deleted or rescheduled. If a container in a Pod crashes the emptyDir content is unaffected. Deleting a Pod deletes all its emptyDirs.
+		- Pod with multiple containers can use emptyDir to share files between them.
+
+		  	containers:
+		  	- name: nginx
+		      image: nginx:1.22.1
+		      ports:
+		      - containerPort: 80
+			  volumeMounts:
+		   	  - name: emptydir-volume
+		      	mountPath: "/var/log/nginx"
+
+			volumes:
+			  - name: emptydir-volume
+			    emptyDir: {} 
+
+ConfigMaps and Secrets 
+	- Cofigmaps are k8s objects that allows us to separate and attach configuration data from the image content of the pod.
+	- We attach environment variables to the pod. 
+	- The data is not encrypted by default in configmaps so better to use non-confidential data in configmaps.
+	
+	Create a configmap
+		1. Create a file by name "app.properties"
+			environment=test
+			database_url="192.168.1.1"
+			database_password="adjhfgjladhgalhg"
+			
+		2. Load the single config file 
+			kubectl create configmap <configmap_name> --from-env-file configs/app.properties
+
+		   Load the multiple config files 	
+			kubectl create configmap <configmap_name> --from-env-file configs/
+	
+	Create a secret 
+		- Data by default encrypted by base64 format and we use it for confidential data 
+
+		1. Get values in base64 format 
+			echo -n '<value>' | base64 
+
+		2. Copy the base64 value got from above command and use it in secrets 
+
+			apiVersion: v1
+			kind: Secret
+			metadata: 
+    			    name: my-secret
+			type: Opaque    
+			data:
+   				db_url: cG9zdGdyYXNlLmRlZmF1bHQuc3ZjLmNsdXN0ZXIubG9jYWw=
+   				db_username: dGVzdF91c2Vy
+   				db_password: cGFzc3dvcmQ= 
+		
+		3. Types of secrets 
+			Opaque					arbitrary user-defined data
+			kubernetes.io/service-account-token	ServiceAccount token
+			kubernetes.io/dockercfg			serialized ~/.dockercfg file
+			kubernetes.io/dockerconfigjson		serialized ~/.docker/config.json file
+			kubernetes.io/basic-auth			credentials for basic authentication
+			kubernetes.io/ssh-auth			credentials for SSH authentication
+			kubernetes.io/tls			data for a TLS client or server
+		
+		4. Using secrets in pod spec
+
+			env: 
+       			   - name: DB_URL
+         		     valueFrom: 
+            		        secretKeyRef: 
+               				name: my-secret
+               				key: db_url
+
+HPA and VPA
+
+	HPA - Horizontal pod autoscaler
+	- HPA will automatically scales the number pf pod replicas using deployment, replicates, statefulSet based on CPU/memory threshold.
+	- We need metric-server as a source for resource monitor for HPA
+
+	1. Install metric server 
+		kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+	2. Add be command to metric-server deployment file 
+		kubectl edit deployment -n kube-system metrics-server
+	 command:
+        - /metrics-server
+        - --kubelet-insecure-tls
+        - --kubelet-preferred-address-types=InternalIP
+
+	kubectl top nodes 
+	kubectl top pods
+
+	Demo 
+	1. Php - application with ClusterIP service 
+		kubectl apply -f deployment-app.yml
+
+	2. Create a HPA 
+		kubectl apply -f HPA.yml
+		kubectl get hpa 
+
+	3. Put load on the application to see the HPA in action 
+	     kubectl apply -f load-deployment.yml
+
+
+	VPA - Vertical pod autoscaler
+
+JOBS
+
+	restartPolicy: 
+	   - This is a pod option on of job 
+	   - Different policies are 
+		Always 
+		  - This is the default restartPolicy. Containers will always be restarted if they stop and 
+		    even if they have completed successfully.	
+	
+		OnFailure
+		   - only restart the pod if the container process exits with an error.
+		   - If the pod is determined to be unhealthy and restarted by a probe then also pod 
+	             will be restarted.
+		
+		Never 
+		   - Pod are never restated even if the container inside pod exists with error.
+
+	apiVersion: batch/v1
+	kind: Job
+	metadata: 
+	   name: my-job 
+	spec:
+	   schedule: "* * * * *" 
+	   completions: 10
+	   parallelism: 2
+	   activeDeadlineSecond: 20	
+	   template:
+	     metadata: 
+		name: my-busybox	 
+             spec: 
+               containers:
+                 - name: busybox 
+                   image: busy box
+                   command: ["echo","k8s JOBS"]
+	       restartPolicy: Never	  
+	
+
+	Common options 
+	
+	completions: 
+		- This is the number of times the job to run. 
+		- The default value is 1
+		- If, completions is 5 then job will run 5 times means 5 pods.
+	
+	parallelism:
+ 		- This is number of jobs to run parallel.
+		- The default value is 1 
+		- By default JOBS run sequentially so to run jobs parallel we need to use this field.
+		 		
+	activeDeadlineSecond:
+		- This filed defines the execution time of pod.
+		- If pod takes more than this time then pod will be terminated.		
+		   
+	backoffLimit:
+		- The number of pod to be created / limited even after failure.
+		- Due to some reason our pods may fail and it affects the completion of job, where 
+		  our job will be creating pods till it gets succeed which will put a load on the cluster.
+                
+	schedule: (CronJOB)
+	     - To the JOB at a particular time.
+	     - Uses the cron syntax (* * * * *) 	
+
+	apiVersion: batch/v1
+	kind: CronJob
+	metadata: 
+	   name: my-job 
+	spec:
+	  schedule: "* * * * *"
+	  successfulJobsHistoryLimit: 0
+	  failedJobsHistoryLimit: 0        
+	  jobTemplate:
+	     spec:
+	       template:      
+	          metadata: 
+	             name: my-busybox	 
+	          spec:
+	             containers:
+	             - name: busybox 
+	               image: busybox
+	               command: ["sh","-c","sleep 2;"]
+	             restartPolicy: OnFailure
+
+Multi master cluster 	
+	What is the size of the k8s cluster ?
+		- we are manitaining different cluster for different environment
+		- we have one big cluster and environments are maintained through namepsaces
+		- always the count of master nodes should a odd number 
+		- we are using loadbalancer / multiple people are working they may dd the worker nodes 
+		  so I never kept exact count of nodes but on average we have 20 to 25 worker nodes.
+	
+	Why always the number of master nodes is odd number ?
+		- Based on Quoram calculation (n/2+1) we get same quoram failure rate for odd number 
+		  and its next even number of nodes, so it is better to use odd number nodes instead 
+		  of even number and we start with minimum 3 master nodes.
+		- Always tell odd number of nodes (any odd number starting with 3, 5, 7, 9)
+		- Based on the quorum value we choose only odd number of nodes starting with 3 to 
+		  achive better fault tollerance cluster.
+
+
+Common errors 
+	ImagePullBackOff or ErrImagePull
+		- Docker registry is not accessible 
+		- Docker image image name or tag is incorrect / It may not exists in the registry 
+
+	RunContainerError 
+	    - ConfigMap/secrets are missing 
+	    - volumes are not accessible/available 	
+
+	CrashLoopBackOff
+	    - This error usually comes when probe fails.
+	    - When the application inside the container is crashing due to some error (Exit 1).
+	    - Error while creating or executing docker image (error in docker image only)
+
+	OOM - OOMKilled, OOMCatch(Out of Memory)     
+		- When pod is requesting resources above its request and limits which are applied.
+		- Memory LEaks in the application only 
+		- In long run containers will start consuming more memory.
+		- Increased traffic or an increase in resource-intensive jobs/workloads 
+		- more unwanted replicas of pods 
+
+10 Most Common Reasons Kubernetes Deployments
+	https://www.kukulinski.com/10-most-common-reasons-kubernetes-deployments-fail-part-1/
+
+helm
+	- Helm uses default kubernetes config $HOME/.kube/config
+    
